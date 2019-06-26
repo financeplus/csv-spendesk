@@ -16,12 +16,14 @@
     "@gitzone/tsbuild": "^2.0.22",
     "@gitzone/tstest": "^1.0.15",
     "@pushrocks/tapbundle": "^3.0.7",
-    "@types/node": "^10.11.7",
-    "tslint": "^5.11.0",
+    "@types/node": "^12.0.10",
+    "tslint": "^5.18.0",
     "tslint-config-prettier": "^1.15.0"
   },
   "dependencies": {
     "@pushrocks/smartcsv": "^1.0.16",
-    "@pushrocks/smartfile": "^7.0.2"
+    "@pushrocks/smartfile": "^7.0.3",
+    "@pushrocks/smarttime": "^3.0.12",
+    "@tsclass/tsclass": "^2.0.0"
   }
 }

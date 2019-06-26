@@ -1,8 +1,12 @@
 import { expect, tap } from '@pushrocks/tapbundle';
 import * as csvSpendesk from '../ts/index';
+import * as path from 'path';
 
-tap.test('first test', async () => {
-  console.log(csvSpendesk.standardExport);
-})
+tap.test('should correctly parse a directory', async tools => {
+  const csvSpendeskInstance = await csvSpendesk.CsvSpendesk.fromDir(
+    path.join(__dirname, '../.nogit/')
+  );
+  console.log(csvSpendeskInstance.transactionArray);
+});
 
 tap.start();

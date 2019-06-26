@@ -1,27 +1,7 @@
 import * as plugins from './csv-spendesk.plugins';
+import * as helpers from './helpers';
 
-export interface IPayment {
-  'Payment date': Date;
-  'Settlement date': Date;
-  Month: string;
-  Payer: string;
-  Team: string;
-  Description: string;
-  Supplier: string;
-  'Expense account': string;
-  'Payment method': string;
-  Type: 'Load' | 'Payment' | 'FXfee';
-  // 'Local amount': number;
-  // 'Local currency': 'EUR';
-  Debit: number;
-  Credit: number;
-  Currency: 'EUR';
-  VAT: number;
-  vatPercentage?: number;
-  State: 'Settled';
-  'Receipt?': boolean;
-  'Receipt name(s)': '';
-}
+import * as interfaces from './interfaces';
 
 export class CsvSpendesk {
   // ========= STATIC ================
@@ -29,9 +9,57 @@ export class CsvSpendesk {
    * get the SpendeskData from an extracted direcotory
    * @param dirPath
    */
-  public static async fromDir(dirPath: string, sevdeskToken: string) {
-    const spendeskParser = new CsvSpendesk(dirPath, sevdeskToken);
-    return spendeskParser;
+  public static async fromFile(filePath: string): Promise<CsvSpendesk> {
+    const reresolvedPath = plugins.path.resolve(filePath);
+    const fileString = plugins.smartfile.fs.toStringSync(reresolvedPath);
+    const csvSpendesk = await CsvSpendesk.fromCsvString(fileString);
+    return csvSpendesk;
+  }
+
+  /**
+   * get the SpendeskData from an extracted direcotory
+   * @param dirPath
+   */
+  public static async fromDir(dirPath: string): Promise<CsvSpendesk> {
+    const foundFiles: string[] = await plugins.smartfile.fs.listFileTree(dirPath, '**/Spendesk*', true);
+    
+    if (foundFiles.length === 0) {
+      throw new Error('no files found!');
+    }
+
+    const csvSpendesks: CsvSpendesk[] = [];
+
+    for (const foundFile of foundFiles) {
+      const fileString = plugins.smartfile.fs.toStringSync(plugins.path.resolve(foundFile));
+      plugins.path.join(dirPath, foundFile);
+      csvSpendesks.push(await this.fromFile(foundFile)) ;
+    }
+
+    let returnCsvSpendesk: CsvSpendesk;
+    for (const csvSpendeskInstance of csvSpendesks) {
+      if (!returnCsvSpendesk) {
+        returnCsvSpendesk = csvSpendeskInstance;
+      } else {
+        await returnCsvSpendesk.concat(csvSpendeskInstance);
+      }
+    }
+    return returnCsvSpendesk;
+  }
+
+  public static async fromCsvString(csvStringArg: string): Promise<CsvSpendesk> {
+    // lets parse the data from the directory
+    const csvInstance = await plugins.smartcsv.Csv.createCsvFromString(csvStringArg, {
+      headers: true
+    });
+
+    // lets differentiate between payments and credits
+    let payments: interfaces.ISpendeskTransaction[] = await csvInstance.exportAsObject();
+
+    // lets preprocess those payments
+    payments = await helpers.preprocessPaymentArray(payments);
+    payments = await helpers.attachSimplifiedTransactions(payments);
+    const csvSpendeskInstance = new CsvSpendesk(payments);
+    return csvSpendeskInstance;
   }
 
   /**
@@ -43,120 +71,34 @@ export class CsvSpendesk {
   }
 
   // ========= INSTANCE ================
-  public csvString: string;
+  public origin: 'api' | 'file' | 'dir';
+  public updateFunction: (fromTimeStamp: plugins.smarttime.TimeStamp, untilTimeStamp: plugins.smarttime.TimeStamp) => interfaces.ISpendeskTransaction[];
+  public transactionArray: interfaces.ISpendeskTransaction[];
 
-  constructor() {
+  constructor(transactionArrayArg: interfaces.ISpendeskTransaction[]) {
+    this.transactionArray = transactionArrayArg;
   }
 
   /**
-   * creates matches
+   * gets all loads
    */
-  async parse(supplierMapArg: SupplierMap) {
-    // lets parse the data from the directory
-    const csvInstance = await plugins.smartcsv.Csv.createCsvFromString(this.csvString, {
-      headers: true
+  public async getLoads() {
+    return this.transactionArray.filter(payment => {
+      return payment.Type === 'Load';
     });
-
-    // lets differentiate between payments and credits
-    let credits: IPayment[];
-    let fxFees: IPayment[];
-    let payments: IPayment[] = await csvInstance.exportAsObject();
-    ({ credits, fxFees, payments } = await this.preprocessPaymentArray(payments));
-
-    // lets handle the credits and fxFees as they don't need further processing
-    await this.handleCredits(credits);
-    await this.handleFxFees(fxFees);
   }
-
-  /**
-   * handles a credit payment that doesn't need to be matched here
-   */
-  private async preprocessPaymentArray(
-    paymentArray: IPayment[]
-  ): Promise<{
-    credits: IPayment[];
-    fxFees: IPayment[];
-    payments: IPayment[];
-  }> {
-    paymentArray = paymentArray.map(paymentCsvObject => {
-      paymentCsvObject['Payment date'] = new Date(paymentCsvObject['Payment date']);
-      paymentCsvObject['Settlement date'] = new Date(paymentCsvObject['Settlement date']);
-      paymentCsvObject.Credit = parseFloat(paymentCsvObject.Credit as any);
-      paymentCsvObject.Debit = parseFloat(paymentCsvObject.Debit as any);
-      paymentCsvObject.VAT = parseFloat(paymentCsvObject.VAT as any);
-      paymentCsvObject.vatPercentage = ((): number => {
-        if (!paymentCsvObject.VAT || paymentCsvObject.VAT === 0) {
-          return 0;
-        } else {
-          return Math.round(
-            (paymentCsvObject.VAT / (paymentCsvObject.Debit - paymentCsvObject.VAT)) * 100
-          );
-        }
-      })();
-      paymentCsvObject['Receipt?'] = (() => {
-        if ((paymentCsvObject['Receipt?'] as any) === 'Yes') {
-          return true;
-        } else {
-          return false;
-        }
-      })();
-      return paymentCsvObject;
-    }) as IPayment[];
-    const creditArray: IPayment[] = [];
-    const fxArray: IPayment[] = [];
-    paymentArray = paymentArray.filter(payment => {
-      if (payment.Credit) {
-        creditArray.push(payment);
-        return false;
-      } else if (payment.Description.startsWith('FX fee')) {
-        fxArray.push(payment);
-        return false;
-      } else {
-        return true;
-      }
+  
+  public async getDebits() {
+    return this.transactionArray.filter(payment => {
+      return payment.Type === 'Payment';
     });
-    return {
-      credits: creditArray,
-      fxFees: fxArray,
-      payments: paymentArray
-    };
-  }
+  };
 
   /**
-   * handles credits
+   * concat this instance's transactions with those of another one
    */
-  private async handleCredits(creditArray: IPayment[]): Promise<void> {
-    for (const credit of creditArray) {
-      const sevdeskTransactionForCreditLoad = new SevdeskTransaction({
-        amount: credit.Credit,
-        sevdeskCheckingAccountId: (await this.sevdeskParser.getSevdeskCheckingAccountByName(
-          'Spendesk'
-        )).sevdeskId,
-        payeeName: 'Lossless GmbH',
-        date: credit['Settlement date'],
-        description: 'Account load by wire transfer or credit card',
-        status: 'unpaid'
-      });
-      await sevdeskTransactionForCreditLoad.save(this.sevdeskParser.sevdeskAccount);
-    }
-  }
-
-  /**
-   * handles FX fees
-   */
-  private async handleFxFees(fxFeeArray: IPayment[]): Promise<void> {
-    for (const fxFee of fxFeeArray) {
-      const sevdeskTransactionForCreditLoad = new SevdeskTransaction({
-        amount: -fxFee.Debit,
-        sevdeskCheckingAccountId: (await this.sevdeskParser.getSevdeskCheckingAccountByName(
-          'Spendesk'
-        )).sevdeskId,
-        payeeName: 'Spendesk',
-        date: fxFee['Settlement date'],
-        description: fxFee.Description,
-        status: 'unpaid'
-      });
-      await sevdeskTransactionForCreditLoad.save(this.sevdeskParser.sevdeskAccount);
-    }
+  public async concat(csvSpendeskInstance: CsvSpendesk): Promise<CsvSpendesk> {
+    this.transactionArray = this.transactionArray.concat(csvSpendeskInstance.transactionArray);
+    return this;
   }
 }
