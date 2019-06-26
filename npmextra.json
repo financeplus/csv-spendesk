@@ -1,0 +1,17 @@
+{
+  "gitzone": {
+    "module": {
+      "githost": "gitlab.com",
+      "gitscope": "financeplus",
+      "gitrepo": "csv-spendesk",
+      "shortDescription": "a csv parser for bank statements by Spendesk",
+      "npmPackagename": "@financeplus/csv-spendesk",
+      "license": "MIT",
+      "projectDomain": "finance.plus"
+    }
+  },
+  "npmci": {
+    "npmGlobalTools": [],
+    "npmAccessLevel": "public"
+  }
+}
