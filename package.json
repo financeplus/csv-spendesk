@@ -1,6 +1,6 @@
 {
   "name": "@financeplus/csv-spendesk",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": false,
   "description": "a csv parser for bank statements by Spendesk",
   "main": "dist/index.js",
