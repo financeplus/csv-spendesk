@@ -80,6 +80,13 @@ export class CsvSpendesk {
   }
 
   /**
+   * gets all transactions
+   */
+  public async getTransactions () {
+    return this.transactionArray;
+  }
+
+  /**
    * gets all loads
    */
   public async getLoads() {
