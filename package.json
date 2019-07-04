@@ -26,5 +26,15 @@
     "@pushrocks/smarthash": "^2.0.6",
     "@pushrocks/smarttime": "^3.0.12",
     "@tsclass/tsclass": "^2.0.0"
-  }
+  },
+  "files": [
+    "ts/*",
+    "ts_web/*",
+    "dist/*",
+    "dist_web/*",
+    "assets/*",
+    "cli.js",
+    "npmextra.json",
+    "readme.md"
+  ]
 }

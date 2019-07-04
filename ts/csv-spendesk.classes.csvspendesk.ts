@@ -131,8 +131,7 @@ export class CsvSpendesk {
         amount: spendeskTransaction.amount,
         transactionDate: spendeskTransaction.paymentDate,
         settlementDate: spendeskTransaction.settlementDate,
-        supplier: spendeskTransaction.supplier,
-
+        supplier: spendeskTransaction.supplier
       });
 
       // simple transaction
