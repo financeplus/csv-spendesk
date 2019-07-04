@@ -9,11 +9,13 @@ export {
 import * as smartcsv from '@pushrocks/smartcsv';
 import * as smartfile from '@pushrocks/smartfile';
 import * as smarttime from '@pushrocks/smarttime';
+import * as smarthash from '@pushrocks/smarthash';
 
 export {
   smartcsv,
   smartfile,
-  smarttime
+  smarttime,
+  smarthash
 };
 
 // tsclass scope

@@ -23,6 +23,7 @@
   "dependencies": {
     "@pushrocks/smartcsv": "^1.0.16",
     "@pushrocks/smartfile": "^7.0.4",
+    "@pushrocks/smarthash": "^2.0.6",
     "@pushrocks/smarttime": "^3.0.12",
     "@tsclass/tsclass": "^2.0.0"
   }

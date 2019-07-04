@@ -1,5 +1,4 @@
 import * as plugins from './csv-spendesk.plugins';
-import * as helpers from './helpers';
 
 import * as interfaces from './interfaces';
 
@@ -21,8 +20,12 @@ export class CsvSpendesk {
    * @param dirPath
    */
   public static async fromDir(dirPath: string): Promise<CsvSpendesk> {
-    const foundFiles: string[] = await plugins.smartfile.fs.listFileTree(dirPath, '**/Spendesk*', true);
-    
+    const foundFiles: string[] = await plugins.smartfile.fs.listFileTree(
+      dirPath,
+      '**/Spendesk*',
+      true
+    );
+
     if (foundFiles.length === 0) {
       throw new Error('no files found!');
     }
@@ -32,7 +35,7 @@ export class CsvSpendesk {
     for (const foundFile of foundFiles) {
       const fileString = plugins.smartfile.fs.toStringSync(plugins.path.resolve(foundFile));
       plugins.path.join(dirPath, foundFile);
-      csvSpendesks.push(await this.fromFile(foundFile)) ;
+      csvSpendesks.push(await this.fromFile(foundFile));
     }
 
     let returnCsvSpendesk: CsvSpendesk;
@@ -53,12 +56,97 @@ export class CsvSpendesk {
     });
 
     // lets differentiate between payments and credits
-    let payments: interfaces.ISpendeskTransaction[] = await csvInstance.exportAsObject();
+    const originalTransactionArray: interfaces.ISpendeskOriginalTransaction[] = (await csvInstance.exportAsObject()) as interfaces.ISpendeskOriginalTransaction[];
+    const paymentsArray: interfaces.ISpendeskTransaction[] = [];
+    for (const originalTransaction of originalTransactionArray) {
+      const spendeskTransaction: interfaces.ISpendeskTransaction = {
+        // the original transaction
+        original: originalTransaction,
 
-    // lets preprocess those payments
-    payments = await helpers.preprocessPaymentArray(payments);
-    payments = await helpers.attachSimplifiedTransactions(payments);
-    const csvSpendeskInstance = new CsvSpendesk(payments);
+        // assigned later
+        paymentType: null,
+        amount: null,
+        simpleTransaction: null,
+        transactionHash: null,
+
+        // assigned now
+        currency: originalTransaction.Currency as interfaces.TAvailableCurrencies,
+        description: originalTransaction.Description,
+        expenseAccount: originalTransaction['Expense account'],
+        month: originalTransaction.Month,
+        payer: originalTransaction.Payer,
+        paymentDate: new Date(originalTransaction['Payment date']),
+        paymentMethod: originalTransaction['Payment method'],
+        paymentState: originalTransaction.State as interfaces.TPaymentState,
+        settlementDate: new Date(originalTransaction['Settlement date']),
+        receiptAvailable: (() => {
+          if ((originalTransaction['Receipt?'] as any) === 'Yes') {
+            return true;
+          } else {
+            return false;
+          }
+        })(),
+        receiptNames: [],
+        supplier: originalTransaction.Supplier,
+        team: originalTransaction.Team,
+        vatAmount: parseInt(originalTransaction.VAT, 10),
+        vatPercentage: ((): number => {
+          if (!originalTransaction.VAT || originalTransaction.VAT === '0') {
+            return 0;
+          } else {
+            const vatAmount = parseInt(originalTransaction.VAT, 10);
+            const debitAmount = parseInt(originalTransaction.Debit, 10);
+            return Math.round((vatAmount / (debitAmount - vatAmount)) * 100);
+          }
+        })()
+      };
+
+      // type
+      spendeskTransaction.paymentType = (() => {
+        if (spendeskTransaction.original.Credit !== '0') {
+          return 'Load';
+        } else if (spendeskTransaction.original.Debit !== '0') {
+          return 'Payment';
+        } else if (spendeskTransaction.original.Description.startsWith('FX fee')) {
+          return 'FXfee';
+        }
+      })();
+
+      // amount
+      spendeskTransaction.amount = (() => {
+        switch (originalTransaction.Type) {
+          case 'Payment':
+          case 'FXfee':
+            return -parseInt(originalTransaction.Debit, 10);
+          case 'Load':
+          case 'Credit':
+            return parseInt(originalTransaction.Credit, 10);
+          default:
+            throw new Error('cannot determine payment amount by type!');
+        }
+      })();
+
+      // transaction hash
+      spendeskTransaction.transactionHash = await plugins.smarthash.sha265FromObject({
+        amount: spendeskTransaction.amount,
+        transactionDate: spendeskTransaction.paymentDate,
+        settlementDate: spendeskTransaction.settlementDate,
+        supplier: spendeskTransaction.supplier,
+
+      });
+
+      // simple transaction
+      spendeskTransaction.simpleTransaction = {
+        accountId: null,
+        id: spendeskTransaction.transactionHash,
+        amount: spendeskTransaction.amount,
+        date: spendeskTransaction.settlementDate,
+        description: spendeskTransaction.description
+      };
+      paymentsArray.push(spendeskTransaction);
+    }
+
+    const csvSpendeskInstance = new CsvSpendesk(paymentsArray);
     return csvSpendeskInstance;
   }
 
@@ -67,12 +155,16 @@ export class CsvSpendesk {
    * @param dirPath
    */
   public static async fromSpendeskCom(dirPath: string) {
-    // TODO:
+    // TODO: implement spendesk API
+    throw new Error(`method is not yet implemented`);
   }
 
   // ========= INSTANCE ================
   public origin: 'api' | 'file' | 'dir';
-  public updateFunction: (fromTimeStamp: plugins.smarttime.TimeStamp, untilTimeStamp: plugins.smarttime.TimeStamp) => interfaces.ISpendeskTransaction[];
+  public updateFunction: (
+    fromTimeStamp: plugins.smarttime.TimeStamp,
+    untilTimeStamp: plugins.smarttime.TimeStamp
+  ) => interfaces.ISpendeskTransaction[];
   public transactionArray: interfaces.ISpendeskTransaction[];
 
   constructor(transactionArrayArg: interfaces.ISpendeskTransaction[]) {
@@ -82,7 +174,7 @@ export class CsvSpendesk {
   /**
    * gets all transactions
    */
-  public async getTransactions () {
+  public async getTransactions() {
     return this.transactionArray;
   }
 
@@ -91,15 +183,15 @@ export class CsvSpendesk {
    */
   public async getLoads() {
     return this.transactionArray.filter(payment => {
-      return payment.Type === 'Load';
+      return payment.paymentType === 'Load';
     });
   }
-  
+
   public async getDebits() {
     return this.transactionArray.filter(payment => {
-      return payment.Type === 'Payment';
+      return payment.paymentType === 'Payment';
     });
-  };
+  }
 
   /**
    * concat this instance's transactions with those of another one
