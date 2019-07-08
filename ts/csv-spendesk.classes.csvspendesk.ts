@@ -61,7 +61,7 @@ export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
     const originalTransactionArray: interfaces.ISpendeskOriginalTransaction[] = (await csvInstance.exportAsObject()) as interfaces.ISpendeskOriginalTransaction[];
     const paymentsArray: interfaces.ISpendeskTransaction[] = [];
     for (const originalTransaction of originalTransactionArray) {
-      const spendeskTransaction: interfaces.ISpendeskTransaction = {
+      const finalTransaction: interfaces.ISpendeskTransaction = {
         // the original transaction
         original: originalTransaction,
 
@@ -104,18 +104,18 @@ export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
       };
 
       // type
-      spendeskTransaction.paymentType = (() => {
-        if (spendeskTransaction.original.Credit !== '0') {
+      finalTransaction.paymentType = (() => {
+        if (finalTransaction.original.Credit !== '0') {
           return 'Load';
-        } else if (spendeskTransaction.original.Debit !== '0') {
+        } else if (finalTransaction.original.Debit !== '0') {
           return 'Payment';
-        } else if (spendeskTransaction.original.Description.startsWith('FX fee')) {
+        } else if (finalTransaction.original.Description.startsWith('FX fee')) {
           return 'FXfee';
         }
       })();
 
       // amount
-      spendeskTransaction.amount = (() => {
+      finalTransaction.amount = (() => {
         switch (originalTransaction.Type) {
           case 'Payment':
           case 'FXfee':
@@ -129,22 +129,23 @@ export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
       })();
 
       // transaction hash
-      spendeskTransaction.transactionHash = await plugins.smarthash.sha265FromObject({
-        amount: spendeskTransaction.amount,
-        transactionDate: spendeskTransaction.paymentDate,
-        settlementDate: spendeskTransaction.settlementDate,
-        supplier: spendeskTransaction.supplier
+      finalTransaction.transactionHash = await plugins.smarthash.sha265FromObject({
+        amount: finalTransaction.amount,
+        transactionDate: finalTransaction.paymentDate,
+        settlementDate: finalTransaction.settlementDate,
+        supplier: finalTransaction.supplier
       });
 
       // simple transaction
-      spendeskTransaction.simpleTransaction = {
+      finalTransaction.simpleTransaction = {
         accountId: null,
-        id: spendeskTransaction.transactionHash,
-        amount: spendeskTransaction.amount,
-        date: spendeskTransaction.settlementDate,
-        description: spendeskTransaction.description
+        id: finalTransaction.transactionHash,
+        amount: finalTransaction.amount,
+        date: finalTransaction.settlementDate,
+        description: finalTransaction.description,
+        name: finalTransaction.supplier
       };
-      paymentsArray.push(spendeskTransaction);
+      paymentsArray.push(finalTransaction);
     }
 
     const csvSpendeskInstance = new CsvSpendesk(paymentsArray);
