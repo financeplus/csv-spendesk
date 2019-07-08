@@ -91,13 +91,13 @@ export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
         receiptNames: [],
         supplier: originalTransaction.Supplier,
         team: originalTransaction.Team,
-        vatAmount: parseInt(originalTransaction.VAT, 10),
+        vatAmount: parseFloat(originalTransaction.VAT),
         vatPercentage: ((): number => {
           if (!originalTransaction.VAT || originalTransaction.VAT === '0') {
             return 0;
           } else {
-            const vatAmount = parseInt(originalTransaction.VAT, 10);
-            const debitAmount = parseInt(originalTransaction.Debit, 10);
+            const vatAmount = parseFloat(originalTransaction.VAT);
+            const debitAmount = parseFloat(originalTransaction.Debit);
             return Math.round((vatAmount / (debitAmount - vatAmount)) * 100);
           }
         })()
@@ -119,10 +119,10 @@ export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
         switch (originalTransaction.Type) {
           case 'Payment':
           case 'FXfee':
-            return -parseInt(originalTransaction.Debit, 10);
+            return -parseFloat(originalTransaction.Debit);
           case 'Load':
           case 'Credit':
-            return parseInt(originalTransaction.Credit, 10);
+            return parseFloat(originalTransaction.Credit);
           default:
             throw new Error('cannot determine payment amount by type!');
         }
