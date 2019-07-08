@@ -2,7 +2,9 @@ import * as plugins from './csv-spendesk.plugins';
 
 import * as interfaces from './interfaces';
 
-export class CsvSpendesk {
+export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
+  interfaces.ISpendeskTransaction
+> {
   // ========= STATIC ================
   /**
    * get the SpendeskData from an extracted direcotory
@@ -159,6 +161,7 @@ export class CsvSpendesk {
   }
 
   // ========= INSTANCE ================
+  public paymentProviderName: string = 'Spendesk';
   public origin: 'api' | 'file' | 'dir';
   public updateFunction: (
     fromTimeStamp: plugins.smarttime.TimeStamp,
@@ -167,6 +170,7 @@ export class CsvSpendesk {
   public transactionArray: interfaces.ISpendeskTransaction[];
 
   constructor(transactionArrayArg: interfaces.ISpendeskTransaction[]) {
+    super();
     this.transactionArray = transactionArrayArg;
   }
 

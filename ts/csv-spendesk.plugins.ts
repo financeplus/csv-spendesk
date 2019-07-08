@@ -1,6 +1,11 @@
 // node natice
 import * as path from 'path';
 
+// financeplus scope
+import * as finplusInterfaces from '@financeplus/finplus-interfaces';
+
+export { finplusInterfaces };
+
 export { path };
 
 // pushrocks scope
