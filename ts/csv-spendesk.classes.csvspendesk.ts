@@ -105,26 +105,26 @@ export class CsvSpendesk extends plugins.finplusInterfaces.AcCsvParser<
 
       // type
       finalTransaction.paymentType = (() => {
-        if (finalTransaction.original.Credit !== '0') {
-          return 'Load';
-        } else if (finalTransaction.original.Debit !== '0') {
-          return 'Payment';
-        } else if (finalTransaction.original.Description.startsWith('FX fee')) {
-          return 'FXfee';
+        let paymentType: interfaces.TPaymentType;
+        if (parseFloat(finalTransaction.original.Credit) !== 0) {
+          paymentType = 'Load';
+        } else if (parseFloat(originalTransaction.Debit) !== 0) {
+          paymentType = 'Payment';
         }
+        
+        if (originalTransaction.Description.startsWith('FX fee')) {
+          paymentType = 'FXfee';
+        }
+        return paymentType;
       })();
 
       // amount
       finalTransaction.amount = (() => {
-        switch (originalTransaction.Type) {
-          case 'Payment':
-          case 'FXfee':
+        switch (parseFloat(originalTransaction.Credit)) {
+          case 0:
             return -parseFloat(originalTransaction.Debit);
-          case 'Load':
-          case 'Credit':
-            return parseFloat(originalTransaction.Credit);
           default:
-            throw new Error('cannot determine payment amount by type!');
+            return parseFloat(originalTransaction.Credit);
         }
       })();
 

@@ -2,6 +2,7 @@ import * as plugins from '../csv-spendesk.plugins';
 
 export type TAvailableCurrencies = 'EUR';
 export type TPaymentState = 'Settled';
+export type TPaymentType = 'Load' | 'Credit' | 'Payment' | 'FXfee';
 
 export interface ISpendeskOriginalTransaction {
   simpleTransaction: plugins.tsclass.ITransaction;
@@ -41,7 +42,7 @@ export interface ISpendeskTransaction {
   supplier: string;
   expenseAccount: string;
   paymentMethod: string;
-  paymentType: 'Load' | 'Credit' | 'Payment' | 'FXfee';
+  paymentType: TPaymentType;
   // 'Local amount': number;
   // 'Local currency': 'EUR';
   amount: number;
